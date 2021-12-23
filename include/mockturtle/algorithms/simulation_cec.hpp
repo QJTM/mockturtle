@@ -22,23 +22,20 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 /*!
   \file simulation_cec.hpp
   \brief Simulation-based CEC
-
   EPFL CS-472 2021 Final Project Option 2
 */
-
 #pragma once
-
 #include <kitty/constructors.hpp>
 #include <kitty/dynamic_truth_table.hpp>
 #include <kitty/operations.hpp>
-
 #include "../utils/node_map.hpp"
 #include "miter.hpp"
 #include "simulation.hpp"
+
+#include <math.h>
 
 namespace mockturtle
 {
@@ -48,14 +45,11 @@ struct simulation_cec_stats
 {
   /*! \brief Split variable (simulation size). */
   uint32_t split_var{ 0 };
-
   /*! \brief Number of simulation rounds. */
   uint32_t rounds{ 0 };
 };
-
 namespace detail
 {
-
 template<class Ntk>
 class simulation_cec_impl
 {
@@ -63,33 +57,87 @@ public:
   using pattern_t = unordered_node_map<kitty::dynamic_truth_table, Ntk>;
   using node = typename Ntk::node;
   using signal = typename Ntk::signal;
-
 public:
   explicit simulation_cec_impl( Ntk& ntk, simulation_cec_stats& st )
       : _ntk( ntk ),
         _st( st )
   {
   }
+  bool run(){
 
-  bool run()
-  {
-    /* TODO: write your implementation here */
-    return false;
+    if (_ntk.num_pis() < 7)
+    {
+      _st.split_var = _ntk.num_pis();
+    } 
+    else
+    { 
+      for (uint32_t sv = 7 ; sv <= _ntk.num_pis() and (32 + std::pow(2, sv - 3) * _ntk.size() < std::pow(2,29)) ; sv++) _st.split_var = sv;  
+    }
+
+    _st.rounds = std::pow(2, _ntk.num_pis() - _st.split_var);
+    
+	  pattern_t patt(_ntk);
+	  default_simulator<kitty::dynamic_truth_table> sim(_st.split_var);
+      for (uint32_t it = 1; it <= _st.rounds; it++)
+      {
+        
+        _ntk.foreach_pi([&](auto const& j)
+        {
+          kitty::dynamic_truth_table tt (_st.split_var);
+          if (j <=  _st.split_var)
+          {
+            kitty::create_nth_var(tt, j - 1);
+          }
+          if ( (j <=  _st.split_var) or ((it >> (j - _st.split_var - 1)) % 2) )
+          {
+            patt[j] = tt;
+          }
+          else 
+          {
+            patt[j] = ~tt;
+          }
+        });
+        
+        simulate_nodes(_ntk, patt, sim);
+        if (eq_check(patt) == false)
+        {
+          return false;
+        } 
+      }
+	  return true;
   }
 
 private:
-  /* you can add additional methods here */
+
+
+
+  bool eq_check(pattern_t& patt){
+    bool eq;
+    _ntk.foreach_po([&](auto const& nc)
+    {
+      if (_ntk.is_complemented(nc))
+      {
+        if (!is_const0(~patt[nc])) eq = false;
+        else eq = true ;
+      }
+      else
+      {
+        if (!is_const0(patt[nc])) eq = false;
+        else eq = true;
+      }
+      
+     } );
+     return eq;
+  }
+
 
 private:
   Ntk& _ntk;
   simulation_cec_stats& _st;
   /* you can add other attributes here */
 };
-
 } // namespace detail
-
 /* Entry point for users to call */
-
 /*! \brief Simulation-based CEC.
  *
  * This function implements a simulation-based combinational equivalence checker.
@@ -109,26 +157,18 @@ std::optional<bool> simulation_cec( Ntk const& ntk1, Ntk const& ntk2, simulation
   static_assert( has_foreach_po_v<Ntk>, "Ntk does not implement the foreach_po method" );
   static_assert( has_foreach_node_v<Ntk>, "Ntk does not implement the foreach_node method" );
   static_assert( has_is_complemented_v<Ntk>, "Ntk does not implement the is_complemented method" );
-
   simulation_cec_stats st;
-
   bool result = false;
-
   if ( ntk1.num_pis() > 40 )
     return std::nullopt;
-
   auto ntk_miter = miter<Ntk>( ntk1, ntk2 );
-
   if ( ntk_miter.has_value() )
   {
     detail::simulation_cec_impl p( *ntk_miter, st );
     result = p.run();
   }
-
   if ( pst )
     *pst = st;
-
   return result;
 }
-
 } // namespace mockturtle
