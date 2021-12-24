@@ -99,7 +99,24 @@ public:
         });
         
         simulate_nodes(_ntk, patt, sim);
-        if (eq_check(patt) == false)
+
+        bool eq;
+         _ntk.foreach_po([&](auto const& nc)
+          {
+          if (_ntk.is_complemented(nc))
+          {
+          if (!is_const0(~patt[nc])) eq = false;
+          else eq = true ;
+          }
+          else
+          {
+          if (!is_const0(patt[nc])) eq = false;
+          else eq = true;
+          }
+      
+          } );
+
+        if (eq == false)
         {
           return false;
         } 
@@ -109,26 +126,6 @@ public:
 
 private:
 
-
-
-  bool eq_check(pattern_t& patt){
-    bool eq;
-    _ntk.foreach_po([&](auto const& nc)
-    {
-      if (_ntk.is_complemented(nc))
-      {
-        if (!is_const0(~patt[nc])) eq = false;
-        else eq = true ;
-      }
-      else
-      {
-        if (!is_const0(patt[nc])) eq = false;
-        else eq = true;
-      }
-      
-     } );
-     return eq;
-  }
 
 
 private:
