@@ -65,16 +65,7 @@ public:
   }
   bool run(){
 
-    if (_ntk.num_pis() < 7)
-    {
-      _st.split_var = _ntk.num_pis();
-    } 
-    else
-    { 
-      for (uint32_t sv = 7 ; sv <= _ntk.num_pis() and (32 + std::pow(2, sv - 3) * _ntk.size() < std::pow(2,29)) ; sv++) _st.split_var = sv;  
-    }
-
-    _st.rounds = std::pow(2, _ntk.num_pis() - _st.split_var);
+    top_rounds();
     
 	  pattern_t patt(_ntk);
 	  default_simulator<kitty::dynamic_truth_table> sim(_st.split_var);
@@ -126,6 +117,18 @@ public:
 
 private:
 
+void top_rounds(){
+    if (_ntk.num_pis() < 7)
+    {
+      _st.split_var = _ntk.num_pis();
+    } 
+    else
+    { 
+      for (uint32_t sv = 7 ; sv <= _ntk.num_pis() and (32 + std::pow(2, sv - 3) * _ntk.size() < std::pow(2,29)) ; sv++) _st.split_var = sv;  
+    }
+
+    _st.rounds = std::pow(2, _ntk.num_pis() - _st.split_var);
+  }
 
 
 private:
